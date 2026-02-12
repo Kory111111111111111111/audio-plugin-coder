@@ -34,6 +34,51 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /**
+ * Utility class for "Interaction Locking".
+ * Enforces a hard visual lock for a set duration after user interaction.
+ * Ignores ALL contradictory backend updates during this period.
+ * This prevents "flicker/revert" issues caused by async race conditions.
+ */
+class InteractionLock {
+    constructor(updateVisualsFn, lockDurationMs = 500) {
+        this.updateVisuals = updateVisualsFn;
+        this.lockDurationMs = lockDurationMs;
+        this.lockedUntil = 0;
+        this.targetValue = null;
+    }
+
+    /** Call this when the USER interacts */
+    onUserAction(newValue) {
+        // 1. Apply User Intent Immediately
+        this.updateVisuals(newValue);
+
+        // 2. Lock the UI to this value
+        this.targetValue = newValue;
+        this.lockedUntil = Date.now() + this.lockDurationMs;
+
+        // console.log(`[Lock] UI Locked to ${newValue} for ${this.lockDurationMs}ms`);
+    }
+
+    /** Call this when the BACKEND sends an event */
+    onBackendUpdate(incomingValue) {
+        // Check if locked
+        if (Date.now() < this.lockedUntil) {
+            // We are in the protected window.
+            // If the incoming value contradicts our target, IGNORE it.
+            if (incomingValue !== this.targetValue) {
+                // console.warn(`[Lock] Ignored conflicting update: ${incomingValue} (Target: ${this.targetValue})`);
+                return;
+            }
+            // If it matches, we allow it (it's consistent), but we keep the lock 
+            // to absorb any subsequent contradictory glitches/echoes.
+        }
+
+        // Unlocked or Consistent -> Apply Update
+        this.updateVisuals(incomingValue);
+    }
+}
+
+/**
  * Initialize all knob controls
  */
 function initializeKnobs() {
@@ -111,6 +156,9 @@ function initializeKnobs() {
         // --- JUCE Listener ---
         if (juceState) {
             juceState.valueChangedEvent.addListener(() => {
+                // If dragging, we prioritize local interaction
+                if (state.isDragging) return;
+
                 state.value = juceState.getScaledValue();
                 updateVisuals();
             });
@@ -173,51 +221,52 @@ function initializeKnobs() {
 }
 
 /**
- * Initialize toggle switches
+ * Initialize toggle switches with robust state handling
  */
 function initializeToggles() {
     const toggles = document.querySelectorAll('.toggle');
 
     toggles.forEach(toggle => {
         const paramId = toggle.dataset.param;
-        const juceState = Juce.getToggleState(paramId); // Corresponds to WebToggleRelay
+        const juceState = Juce.getToggleState(paramId);
 
-        const updateVisuals = (isActive) => {
-            if (isActive) {
-                toggle.classList.add('active');
-            } else {
-                toggle.classList.remove('active');
-            }
+        // Visual update logic
+        const updateDom = (isActive) => {
+            const active = !!isActive;
+            if (active) toggle.classList.add('active');
+            else toggle.classList.remove('active');
 
-            // Light up parent module
             const module = toggle.closest('.module-card');
             if (module) {
-                if (isActive) module.classList.add('active');
+                if (active) module.classList.add('active');
                 else module.classList.remove('active');
             }
         };
 
+        // Create Sync Manager
+        const lock = new InteractionLock(updateDom, 500);
+
         // JUCE Listener
         if (juceState) {
             juceState.valueChangedEvent.addListener((newValue) => {
-                updateVisuals(newValue);
+                lock.onBackendUpdate(!!newValue);
             });
-            // Initial sync
-            updateVisuals(juceState.getValue());
+            // Initial sync (bypass optimistic logic)
+            updateDom(juceState.getValue());
         }
 
         // Interaction
-        toggle.addEventListener('mousedown', function (e) {
-            e.preventDefault(); // Prevent double triggers on some devices
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
 
-            // Current visual state
             const isCurrentlyActive = toggle.classList.contains('active');
             const newState = !isCurrentlyActive;
 
-            console.log(`Toggle ${paramId} clicked: ${newState}`);
+            console.log(`[Interaction] ${paramId}: ${newState}`);
 
-            // Optimistic update
-            updateVisuals(newState);
+            // Notify Sync Manager
+            lock.onUserAction(newState);
 
             // Notify JUCE
             if (juceState) {
@@ -240,40 +289,40 @@ function initializeSelectors() {
 
     const satTypes = ['TUBE', 'TAPE', 'DIODE', 'DIGI'];
 
-    const updateVisuals = (index) => {
+    // Visual Update
+    const updateDom = (index) => {
         if (index >= 0 && index < satTypes.length) {
             satDisplay.textContent = satTypes[index];
         }
     };
 
+    // Sync Manager (Values are integers 0-3)
+    const lock = new InteractionLock(updateDom, 500);
+
     if (juceState) {
-        juceState.valueChangedEvent.addListener((val) => {
-            // value is normalized 0.0-1.0 in ComboBoxState.value property, 
-            // but for ComboBoxState we usually care about the index.
-            // Wait, ComboBoxState.handleEvent updates this.value
-            // And this.value is used by getChoiceIndex().
-            // But valueChangedEvent passes 'this.value' (normalized).
-            // So we should call getChoiceIndex() to be sure, or map it.
-            updateVisuals(juceState.getChoiceIndex());
+        juceState.valueChangedEvent.addListener(() => {
+            // ComboBoxState updates 'value' (0.0-1.0) internally before this event.
+            // But getChoiceIndex() derives from it.
+            lock.onBackendUpdate(juceState.getChoiceIndex());
         });
-        updateVisuals(juceState.getChoiceIndex());
+        updateDom(juceState.getChoiceIndex());
     }
 
-    satDisplay.onclick = function () {
-        // Get current index
+    satDisplay.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
         let currentIndex = juceState ? juceState.getChoiceIndex() : 0;
-        // If not connected, we need to store state locally, but for now assuming logic works
-        // Fallback if juceState is null (UI testing)
+        // Fallback for independent testing
         if (!juceState) {
-            // Find current text in array
             currentIndex = satTypes.indexOf(satDisplay.textContent);
             if (currentIndex === -1) currentIndex = 0;
         }
 
         const nextIndex = (currentIndex + 1) % satTypes.length;
 
-        // Optimistic update
-        updateVisuals(nextIndex);
+        // Notify Sync Manager
+        lock.onUserAction(nextIndex);
 
         // Notify JUCE
         if (juceState) {

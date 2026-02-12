@@ -1,4 +1,3 @@
-ou also
 <!DOCTYPE html>
 <html lang="en">
 
@@ -284,6 +283,7 @@ ou also
             width: 48px;
             height: 48px;
             cursor: ns-resize;
+            /* Remove filter here to avoid square artifacts */
         }
 
         .knob-container.small {
@@ -295,6 +295,8 @@ ou also
             width: 100%;
             height: 100%;
             transform: rotate(-90deg);
+            overflow: visible;
+            /* Fix clipping that creates square artifacts */
         }
 
         .knob-track {
@@ -308,7 +310,8 @@ ou also
             stroke: var(--primary);
             stroke-width: 5;
             stroke-linecap: round;
-            filter: drop-shadow(0 0 8px var(--primary-glow));
+            filter: drop-shadow(0 0 6px var(--primary-glow));
+            /* Tighter glow */
             opacity: 0.4;
             transition: opacity 0.3s;
         }

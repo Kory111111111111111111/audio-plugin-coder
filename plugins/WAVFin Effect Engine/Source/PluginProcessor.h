@@ -68,10 +68,15 @@ private:
     // LFO/Modulation state
     float filterLfoPhase = 0.0f;
     float panLfoPhase = 0.0f;
-    float vintageWowPhase = 0.0f;
-    float vintageFlutterPhase = 0.0f;
+    double vintageWowPhase = 0.0;
+    double vintageFlutterPhase = 0.0;
     
-    // Halftime state
+    // Halftime State
+    double lastBarPosition = 0.0;
+    int activeHalftimeVoice = 0; // 0 = Voice 1, 1 = Voice 2
+    float halftimeCrossfade = 0.0f; // 0.0 = Voice 1 fully active, 1.0 = Voice 2 fully active
+    
+    // Halftime DSP
     juce::AudioBuffer<float> halftimeBuffer;
     int halftimeWritePos = 0;
     float halftimeReadPos1 = 0.0f;

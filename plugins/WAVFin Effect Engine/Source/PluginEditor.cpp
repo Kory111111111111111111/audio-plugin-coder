@@ -17,7 +17,52 @@ WAVFinEffectEngineAudioProcessorEditor::WAVFinEffectEngineAudioProcessorEditor (
         return *p;
     };
 
-    // 2. Initialize WebView (MUST be before attachments)
+    // 2. Create attachments (MUST be before webView to sync initial state)
+    //    We initialize these first so the Relays contain the correct current parameter values
+    //    when they are passed to the WebView Options below.
+    globalMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::global_mix), globalMixRelay, nullptr);
+    outputGainAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::output_gain), outputGainRelay, nullptr);
+
+    reverbEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::reverb_enable), reverbEnableRelay, nullptr);
+    reverbSizeAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_size), reverbSizeRelay, nullptr);
+    reverbDecayAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_decay), reverbDecayRelay, nullptr);
+    reverbMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_mix), reverbMixRelay, nullptr);
+
+    delayEnableAttachment      = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::delay_enable), delayEnableRelay, nullptr);
+    delayTimeAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_time), delayTimeRelay, nullptr);
+    delayFeedbackAttachment    = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_feedback), delayFeedbackRelay, nullptr);
+    delayMixAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_mix), delayMixRelay, nullptr);
+
+    chorusEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::chorus_enable), chorusEnableRelay, nullptr);
+    chorusRateAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_rate), chorusRateRelay, nullptr);
+    chorusDepthAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_depth), chorusDepthRelay, nullptr);
+    chorusMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_mix), chorusMixRelay, nullptr);
+
+    filterEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::filter_enable), filterEnableRelay, nullptr);
+    filterCutoffAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_cutoff), filterCutoffRelay, nullptr);
+    filterResAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_res), filterResRelay, nullptr);
+    filterLfoRateAttachment    = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_lfo_rate), filterLfoRateRelay, nullptr);
+    filterLfoDepthAttachment   = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_lfo_depth), filterLfoDepthRelay, nullptr);
+
+    panEnableAttachment        = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::pan_enable), panEnableRelay, nullptr);
+    panRateAttachment          = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::pan_rate), panRateRelay, nullptr);
+    panDepthAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::pan_depth), panDepthRelay, nullptr);
+
+    halftimeEnableAttachment   = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::halftime_enable), halftimeEnableRelay, nullptr);
+    halftimeMixAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::halftime_mix), halftimeMixRelay, nullptr);
+    halftimeFadeAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::halftime_fade), halftimeFadeRelay, nullptr);
+
+    vintageEnableAttachment    = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::vintage_enable), vintageEnableRelay, nullptr);
+    vintageWowAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_wow), vintageWowRelay, nullptr);
+    vintageFlutterAttachment   = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_flutter), vintageFlutterRelay, nullptr);
+    vintageNoiseAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_noise), vintageNoiseRelay, nullptr);
+
+    satEnableAttachment        = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::sat_enable), satEnableRelay, nullptr);
+    satDriveAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::sat_drive), satDriveRelay, nullptr);
+    satTypeAttachment          = std::make_unique<juce::WebComboBoxParameterAttachment>(getParam(ParameterIDs::sat_type), satTypeRelay, nullptr);
+    satMixAttachment           = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::sat_mix), satMixRelay, nullptr);
+
+    // 3. Initialize WebView (Now Relays are populated)
     webView = std::make_unique<juce::WebBrowserComponent>(
         juce::WebBrowserComponent::Options()
             .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
@@ -61,49 +106,6 @@ WAVFinEffectEngineAudioProcessorEditor::WAVFinEffectEngineAudioProcessorEditor (
     );
 
     addAndMakeVisible(*webView);
-
-    // 3. Create attachments (AFTER webView)
-    globalMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::global_mix), globalMixRelay, nullptr);
-    outputGainAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::output_gain), outputGainRelay, nullptr);
-
-    reverbEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::reverb_enable), reverbEnableRelay, nullptr);
-    reverbSizeAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_size), reverbSizeRelay, nullptr);
-    reverbDecayAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_decay), reverbDecayRelay, nullptr);
-    reverbMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::reverb_mix), reverbMixRelay, nullptr);
-
-    delayEnableAttachment      = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::delay_enable), delayEnableRelay, nullptr);
-    delayTimeAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_time), delayTimeRelay, nullptr);
-    delayFeedbackAttachment    = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_feedback), delayFeedbackRelay, nullptr);
-    delayMixAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::delay_mix), delayMixRelay, nullptr);
-
-    chorusEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::chorus_enable), chorusEnableRelay, nullptr);
-    chorusRateAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_rate), chorusRateRelay, nullptr);
-    chorusDepthAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_depth), chorusDepthRelay, nullptr);
-    chorusMixAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::chorus_mix), chorusMixRelay, nullptr);
-
-    filterEnableAttachment     = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::filter_enable), filterEnableRelay, nullptr);
-    filterCutoffAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_cutoff), filterCutoffRelay, nullptr);
-    filterResAttachment        = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_res), filterResRelay, nullptr);
-    filterLfoRateAttachment    = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_lfo_rate), filterLfoRateRelay, nullptr);
-    filterLfoDepthAttachment   = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::filter_lfo_depth), filterLfoDepthRelay, nullptr);
-
-    panEnableAttachment        = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::pan_enable), panEnableRelay, nullptr);
-    panRateAttachment          = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::pan_rate), panRateRelay, nullptr);
-    panDepthAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::pan_depth), panDepthRelay, nullptr);
-
-    halftimeEnableAttachment   = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::halftime_enable), halftimeEnableRelay, nullptr);
-    halftimeMixAttachment      = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::halftime_mix), halftimeMixRelay, nullptr);
-    halftimeFadeAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::halftime_fade), halftimeFadeRelay, nullptr);
-
-    vintageEnableAttachment    = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::vintage_enable), vintageEnableRelay, nullptr);
-    vintageWowAttachment       = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_wow), vintageWowRelay, nullptr);
-    vintageFlutterAttachment   = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_flutter), vintageFlutterRelay, nullptr);
-    vintageNoiseAttachment     = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::vintage_noise), vintageNoiseRelay, nullptr);
-
-    satEnableAttachment        = std::make_unique<juce::WebToggleButtonParameterAttachment>(getParam(ParameterIDs::sat_enable), satEnableRelay, nullptr);
-    satDriveAttachment         = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::sat_drive), satDriveRelay, nullptr);
-    satTypeAttachment          = std::make_unique<juce::WebComboBoxParameterAttachment>(getParam(ParameterIDs::sat_type), satTypeRelay, nullptr);
-    satMixAttachment           = std::make_unique<juce::WebSliderParameterAttachment>(getParam(ParameterIDs::sat_mix), satMixRelay, nullptr);
 
     // 4. Load UI
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());

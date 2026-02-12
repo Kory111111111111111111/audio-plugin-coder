@@ -272,53 +272,119 @@ void WAVFinEffectEngineAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     juce::dsp::AudioBlock<float> block (buffer);
     juce::dsp::ProcessContextReplacing<float> context (block);
 
-    // 1. Halftime (FIXED: Frame-consistent state and dual-voice crossfading)
+    // 1. Halftime (IMPROVED: Grid-Synced Dual-Voice with Bar Reset)
     if (halftimeEnableParam && halftimeEnableParam->load() > 0.5f)
     {
         float mix = halftimeMixParam->load() / 100.0f;
-        float fade = halftimeFadeParam->load() / 100.0f; // Softness/Crossfade width
+        float fadeTimeMs = 10.0f + (halftimeFadeParam->load() * 2.0f); // 10ms to 200ms crossfade
         int bufferSize = buffer.getNumSamples();
         int halftimeBufferSize = halftimeBuffer.getNumSamples();
+
+        // --- Get Host Sync Info ---
+        double ppqPosition = 0.0;
+        double bpm = 120.0;
+        bool isPlaying = false;
         
-        // We'll update positions once per process block for simplicity in the loop, 
-        // but we'll track them carefully.
+        if (auto* playHead = getPlayHead())
+        {
+            if (auto positionInfo = playHead->getPosition())
+            {
+                if (auto bpmVal = positionInfo->getBpm())
+                    bpm = *bpmVal;
+                if (auto ppqVal = positionInfo->getPpqPosition())
+                    ppqPosition = *ppqVal;
+                if (positionInfo->getIsPlaying())
+                    isPlaying = true;
+            }
+        }
+        
+        // Loop Length in Beats (Force 1 Bar = 4 Beats for now, standard Trap Halftime)
+        double loopLengthBeats = 4.0; 
+        double currentBarValues = ppqPosition / loopLengthBeats;
+        double currentBarFract = currentBarValues - std::floor(currentBarValues);
+        
+        // Detect Trigger (New Loop Start)
+        // If we wrapped (fract < last) or just started playing
+        bool trigger = false;
+        if (isPlaying)
+        {
+            if (currentBarFract < lastBarPosition && lastBarPosition > 0.5) 
+                trigger = true;
+        }
+        else 
+        {
+            // Fallback Timer for non-playing hosts (approx 1 bar at 120bpm = 2s)
+            // We just use the free running voices if transport is stopped, 
+            // but we need to update the lastBarPosition to mimic movement for smooth seek
+             lastBarPosition = std::fmod(lastBarPosition + (bufferSize / (currentSampleRate * 2.0)), 1.0);
+             if (lastBarPosition < 0.001) trigger = true;
+        }
+
+        lastBarPosition = currentBarFract;
+
+        // On Trigger: Swap Voices
+        if (trigger)
+        {
+            activeHalftimeVoice = 1 - activeHalftimeVoice; // Swap 0 <-> 1
+            
+            // Reset the NEW active voice to current write head (start of bar)
+            // The OLD active voice continues playing its tail (fade out)
+            if (activeHalftimeVoice == 0) halftimeReadPos1 = static_cast<float>(halftimeWritePos);
+            else                          halftimeReadPos2 = static_cast<float>(halftimeWritePos);
+        }
+
+        // Calculate crossfade step
+        float samplesPerFade = (fadeTimeMs / 1000.0f) * static_cast<float>(currentSampleRate);
+        float fadeStep = 1.0f / (samplesPerFade > 1.0f ? samplesPerFade : 1.0f);
+
         for (int s = 0; s < bufferSize; ++s)
         {
+            // Update Crossfade
+            if (activeHalftimeVoice == 0)
+            {
+                // Target: Voice 1 (Fade -> 0.0)
+                if (halftimeCrossfade > 0.0f) halftimeCrossfade = std::max(0.0f, halftimeCrossfade - fadeStep);
+            }
+            else
+            {
+                // Target: Voice 2 (Fade -> 1.0)
+                if (halftimeCrossfade < 1.0f) halftimeCrossfade = std::min(1.0f, halftimeCrossfade + fadeStep);
+            }
+            
+            float gain2 = halftimeCrossfade; // Voice 2 gain
+            float gain1 = 1.0f - gain2;      // Voice 1 gain (Linear or Equal Power? Linear is safer for correlated)
+
             for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             {
                 auto* channelData = buffer.getWritePointer(ch);
                 auto* halftimeData = halftimeBuffer.getWritePointer(ch);
                 
-                // Write current sample to circular buffer
+                // Write
                 halftimeData[halftimeWritePos] = channelData[s];
                 
-                // Voice 1
+                // Voice 1 Read
                 int r1_i = static_cast<int>(halftimeReadPos1);
                 int r1_next = (r1_i + 1) % halftimeBufferSize;
                 float f1 = halftimeReadPos1 - static_cast<float>(r1_i);
                 float voice1 = halftimeData[r1_i] + f1 * (halftimeData[r1_next] - halftimeData[r1_i]);
                 
-                // Voice 2 (180 degrees out of phase)
+                // Voice 2 Read
                 int r2_i = static_cast<int>(halftimeReadPos2);
                 int r2_next = (r2_i + 1) % halftimeBufferSize;
                 float f2 = halftimeReadPos2 - static_cast<float>(r2_i);
                 float voice2 = halftimeData[r2_i] + f2 * (halftimeData[r2_next] - halftimeData[r2_i]);
                 
-                // Calculate crossfade gain based on distance between read and write heads
-                float dist1 = static_cast<float>((halftimeWritePos - r1_i + halftimeBufferSize) % halftimeBufferSize);
-                float gain1 = juce::jlimit(0.0f, 1.0f, dist1 / (halftimeBufferSize * 0.1f * (fade + 0.1f)));
+                // Mix Voices
+                float wetSample = (voice1 * gain1) + (voice2 * gain2);
                 
-                float dist2 = static_cast<float>((halftimeWritePos - r2_i + halftimeBufferSize) % halftimeBufferSize);
-                float gain2 = 1.0f - gain1;
-                
-                float halftimeSample = (voice1 * gain1) + (voice2 * gain2);
-                
-                // Mix dry/wet
-                channelData[s] = (halftimeSample * mix) + (channelData[s] * (1.0f - mix));
+                // Mix Dry/Wet
+                channelData[s] = (wetSample * mix) + (channelData[s] * (1.0f - mix));
             }
             
-            // Update positions ONCE per frame
+            // Advance positions
             halftimeWritePos = (halftimeWritePos + 1) % halftimeBufferSize;
+            
+            // Advance read heads at 0.5x speed
             halftimeReadPos1 += 0.5f;
             halftimeReadPos2 += 0.5f;
             
