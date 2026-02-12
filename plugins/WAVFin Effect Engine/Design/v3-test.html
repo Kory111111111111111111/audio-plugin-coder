@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAVFin Effect Engine (v3)</title>
+    <style>
+        /* ----- V2 COLOR PALETTE ----- */
+        :root {
+            /* Brand Colors */
+            --primary: #f59e0b;
+            /* Accent: Amber (for active elements) */
+            --primary-light: #22d3ee;
+            /* Secondary Light: Cyan */
+            --secondary: #06b6d4;
+            /* Secondary: Cyan */
+
+            /* Backgrounds (Dark Theme) */
+            --bg-main: #0f172a;
+            /* Deep Navy */
+            --bg-module: rgba(30, 41, 59, 0.6);
+            /* Dark Slate with opacity for glass */
+            --bg-header: rgba(15, 23, 42, 0.8);
+            /* Deep Navy with opacity */
+
+            /* Borders & Tracks */
+            --border-light: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(245, 158, 11, 0.3);
+            /* Amber accent border */
+            --knob-track: #334155;
+            /* Slate (Tertiary BG) */
+
+            /* Text */
+            --text-primary: #ffffff;
+            --text-secondary: #e2e8f0;
+            /* Light Gray */
+            --text-muted: #94a3b8;
+            /* Gray 400 */
+
+            --font-stack: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: #000;
+            /* Context background */
+            color: var(--text-primary);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* PLUGIN WINDOW CONTAINER */
+        #plugin-window {
+            width: 900px;
+            height: 600px;
+            background: var(--bg-main);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            /* Slightly sharper radius for "Professional" look */
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* BACKGROUND TEXTURE (SUBTLE) */
+        #bg-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 120%, #1e293b 0%, var(--bg-main) 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* HEADER */
+        header {
+            height: 64px;
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-header);
+            backdrop-filter: blur(12px);
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--primary);
+            opacity: 0.9;
+        }
+
+        h1 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 0;
+            color: var(--text-primary);
+            opacity: 0.9;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 24px;
+            /* Reduced gap for smaller controls */
+            align-items: center;
+        }
+
+        /* MAIN GRID */
+        main {
+            flex: 1;
+            padding: 24px 32px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 16px;
+            z-index: 1;
+        }
+
+        /* EFFECT MODULE CARD */
+        .module-card {
+            background: var(--bg-module);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            position: relative;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(8px);
+        }
+
+        .module-card:hover {
+            background: rgba(44, 44, 46, 0.7);
+        }
+
+        .module-card.active {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: var(--border-accent);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 0 4px;
+        }
+
+        .module-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .module-card.active .module-title {
+            color: var(--primary);
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .module-content {
+            flex: 1;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        /* CONTROLS */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Small Header Control Group */
+        .control-group.small {
+            gap: 6px;
+        }
+
+        .knob-container {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            cursor: ns-resize;
+        }
+
+        /* V3 UPDATE: SMALLER KNOB CLASS */
+        .knob-container.small {
+            width: 32px;
+            height: 32px;
+        }
+
+        .knob-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+            overflow: visible;
+        }
+
+        .knob-track {
+            fill: none;
+            stroke: var(--knob-track);
+            stroke-width: 4;
+            opacity: 0.6;
+        }
+
+        .knob-container.small .knob-track {
+            stroke-width: 5;
+            /* Keep visually consistent thickness */
+        }
+
+        .knob-value-arc {
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-dasharray: 100 100;
+            transition: stroke-dasharray 0.05s linear;
+            filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4));
+            opacity: 0.6;
+        }
+
+        .knob-container.small .knob-value-arc {
+            stroke-width: 5;
+        }
+
+        .module-card.active .knob-value-arc {
+            opacity: 1;
+            filter: drop-shadow(0 0 6px var(--primary));
+        }
+
+        .knob-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .knob-container.small .knob-text {
+            font-size: 9px;
+            /* Smaller text for smaller knob */
+        }
+
+        .module-card.active .knob-text {
+            color: var(--text-primary);
+        }
+
+        .control-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        .control-group.small .control-label {
+            font-size: 9px;
+        }
+
+        /* TOGGLE SWITCH */
+        .toggle {
+            width: 32px;
+            height: 18px;
+            background: var(--knob-track);
+            border-radius: 9px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 1px solid transparent;
+        }
+
+        .toggle:hover {
+            border-color: var(--text-muted);
+        }
+
+        .toggle.active {
+            background: var(--primary);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+            border-color: transparent;
+        }
+
+        .toggle-handle {
+            width: 14px;
+            height: 14px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 1px;
+            left: 2px;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle.active .toggle-handle {
+            transform: translateX(14px);
+        }
+
+        /* SELECTOR (Saturation Type) */
+        .selector {
+            background: rgba(51, 65, 85, 0.5);
+            /* Slate transparent */
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border: 1px solid var(--border-light);
+            transition: all 0.2s;
+            min-width: 48px;
+            text-align: center;
+        }
+
+        .selector:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+            background: rgba(51, 65, 85, 0.8);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="plugin-window">
+        <div id="bg-gradient"></div>
+
+        <header>
+            <div class="brand">
+                <div class="brand-logo"></div>
+                <h1>WAVFin Effect Engine</h1>
+            </div>
+
+            <div class="header-controls">
+                <!-- GLOBAL MIX (SMALL) -->
+                <div class="control-group small">
+                    <div class="knob-container small" data-param="global_mix" data-min="0" data-max="100"
+                        data-value="100" data-suffix="%"></div>
+                    <div class="control-label">MIX</div>
+                </div>
+
+                <!-- OUTPUT GAIN (SMALL) -->
+                <div class="control-group small">
+                    <div class="knob-container small" data-param="output_gain" data-min="-24" data-max="24"
+                        data-value="0" data-suffix="dB"></div>
+                    <div class="control-label">OUTPUT</div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- 1. HALFTIME -->
+            <div class="module-card" id="mod-halftime">
+                <div class="module-header">
+                    <span class="module-title">Halftime</span>
+                    <div class="toggle" data-param="halftime_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="halftime_mix" data-min="0" data-max="100"
+                            data-value="100" data-suffix="%"></div>
+                        <div class="control-label">MIX</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="halftime_fade" data-min="0" data-max="100"
+                            data-value="10" data-suffix="ms"></div>
+                        <div class="control-label">SMOOTH</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. SATURATION -->
+            <div class="module-card" id="mod-sat">
+                <div class="module-header">
+                    <span class="module-title">Sat</span>
+                    <div class="toggle" data-param="sat_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="sat_drive" data-min="0" data-max="48" data-value="0"
+                            data-suffix="dB"></div>
+                        <div class="control-label">DRIVE</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="selector" id="sat_type_display" onclick="cycleSatType()">TUBE</div>
+                        <div class="control-label">TYPE</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="sat_mix" data-min="0" data-max="100" data-value="100"
+                            data-suffix="%"></div>
+                        <div class="control-label">MIX</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. AUTO FILTER -->
+            <div class="module-card" id="mod-filter">
+                <div class="module-header">
+                    <span class="module-title">Filter</span>
+                    <div class="toggle" data-param="filter_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="filter_cutoff" data-min="20" data-max="20000"
+                            data-value="2000" data-suffix="Hz" data-log="true"></div>
+                        <div class="control-label">FREQ</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="filter_lfo_rate" data-min="0" data-max="20"
+                            data-value="2" data-suffix="Hz"></div>
+                        <div class="control-label">LFO</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. VINTAGE -->
+            <div class="module-card" id="mod-vintage">
+                <div class="module-header">
+                    <span class="module-title">Vintage</span>
+                    <div class="toggle" data-param="vintage_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="vintage_wow" data-min="0" data-max="100" data-value="20"
+                            data-suffix="%"></div>
+                        <div class="control-label">WOW</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="vintage_noise" data-min="0" data-max="100"
+                            data-value="0" data-suffix="%"></div>
+                        <div class="control-label">NOISE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. CHORUS -->
+            <div class="module-card" id="mod-chorus">
+                <div class="module-header">
+                    <span class="module-title">Chorus</span>
+                    <div class="toggle" data-param="chorus_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="chorus_rate" data-min="0" data-max="10" data-value="1.0"
+                            data-suffix="Hz"></div>
+                        <div class="control-label">RATE</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="chorus_depth" data-min="0" data-max="100"
+                            data-value="50" data-suffix="%"></div>
+                        <div class="control-label">DEPTH</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="chorus_mix" data-min="0" data-max="100" data-value="50"
+                            data-suffix="%"></div>
+                        <div class="control-label">MIX</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. AUTOPAN -->
+            <div class="module-card" id="mod-autopan">
+                <div class="module-header">
+                    <span class="module-title">Autopan</span>
+                    <div class="toggle" data-param="pan_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="pan_rate" data-min="0" data-max="20" data-value="1.0"
+                            data-suffix="Hz"></div>
+                        <div class="control-label">RATE</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="pan_depth" data-min="0" data-max="100" data-value="100"
+                            data-suffix="%"></div>
+                        <div class="control-label">DEPTH</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. DELAY -->
+            <div class="module-card" id="mod-delay">
+                <div class="module-header">
+                    <span class="module-title">Delay</span>
+                    <div class="toggle" data-param="delay_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="delay_time" data-min="0" data-max="2000"
+                            data-value="500" data-suffix="ms"></div>
+                        <div class="control-label">TIME</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="delay_feedback" data-min="0" data-max="100"
+                            data-value="40" data-suffix="%"></div>
+                        <div class="control-label">FDBK</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="delay_mix" data-min="0" data-max="100" data-value="30"
+                            data-suffix="%"></div>
+                        <div class="control-label">MIX</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. REVERB -->
+            <div class="module-card" id="mod-reverb">
+                <div class="module-header">
+                    <span class="module-title">Reverb</span>
+                    <div class="toggle" data-param="reverb_enable">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="control-group">
+                        <div class="knob-container" data-param="reverb_decay" data-min="0.1" data-max="10"
+                            data-value="2.0" data-suffix="s"></div>
+                        <div class="control-label">DECAY</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="reverb_size" data-min="0" data-max="100" data-value="50"
+                            data-suffix="%"></div>
+                        <div class="control-label">SIZE</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="knob-container" data-param="reverb_mix" data-min="0" data-max="100" data-value="30"
+                            data-suffix="%"></div>
+                        <div class="control-label">MIX</div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- KNOB LOGIC ---
+        const knobs = document.querySelectorAll('.knob-container');
+
+        knobs.forEach(knob => {
+            // Create SVG structure
+            knob.innerHTML = `
+            <svg class="knob-svg" viewBox="0 0 36 36">
+                <path class="knob-track" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" stroke-dasharray="75, 25" />
+                <path class="knob-value-arc" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" stroke-dasharray="0, 100" />
+            </svg>
+            <div class="knob-text"></div>
+        `;
+
+            const state = {
+                isDragging: false,
+                startY: 0,
+                startValue: parseFloat(knob.dataset.value),
+                min: parseFloat(knob.dataset.min),
+                max: parseFloat(knob.dataset.max),
+                value: parseFloat(knob.dataset.value),
+                suffix: knob.dataset.suffix || ''
+            };
+
+            const updateVisuals = () => {
+                const range = state.max - state.min;
+                const percent = (state.value - state.min) / range;
+                const arcLength = percent * 75; // 75 is the dasharray max for 270 degrees
+
+                const arc = knob.querySelector('.knob-value-arc');
+                arc.style.strokeDasharray = `${arcLength}, 100`;
+
+                const text = knob.querySelector('.knob-text');
+                // Format nice text
+                if (state.value >= 1000) {
+                    text.textContent = (state.value / 1000).toFixed(1) + 'k';
+                } else if (Math.abs(state.value) < 10 && state.value % 1 !== 0) {
+                    text.textContent = state.value.toFixed(1);
+                } else {
+                    text.textContent = Math.round(state.value);
+                }
+            };
+
+            updateVisuals();
+
+            knob.addEventListener('mousedown', (e) => {
+                state.isDragging = true;
+                state.startY = e.clientY;
+                state.startValue = state.value;
+                document.body.style.cursor = 'ns-resize';
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!state.isDragging) return;
+
+                const deltaY = state.startY - e.clientY;
+                const range = state.max - state.min;
+                const sensitivity = range / 200; // pixels to full range
+
+                let newValue = state.startValue + (deltaY * sensitivity);
+                newValue = Math.max(state.min, Math.min(state.max, newValue));
+
+                state.value = newValue;
+                updateVisuals();
+            });
+
+            window.addEventListener('mouseup', () => {
+                state.isDragging = false;
+                document.body.style.cursor = 'default';
+            });
+        });
+
+        // --- TOGGLE LOGIC ---
+        const toggles = document.querySelectorAll('.toggle');
+        toggles.forEach(toggle => {
+            toggle.addEventListener('click', function () {
+                this.classList.toggle('active');
+                // Find parent module to light up
+                const module = this.closest('.module-card');
+                if (module) {
+                    module.classList.toggle('active');
+                }
+            });
+        });
+
+        // --- SAT TYPE LOGIC ---
+        const satTypes = ['TUBE', 'TAPE', 'DIODE', 'DIGI'];
+        let currentSatType = 0;
+        const satDisplay = document.getElementById('sat_type_display');
+
+        window.cycleSatType = function () {
+            currentSatType = (currentSatType + 1) % satTypes.length;
+            satDisplay.textContent = satTypes[currentSatType];
+        }
+
+    </script>
+</body>
+
+</html>

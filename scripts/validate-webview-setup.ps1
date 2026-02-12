@@ -144,8 +144,8 @@ if (Test-Path $EditorCpp) {
 # Check 6: Resource loading mechanism exists
 if (Test-Path $EditorCpp) {
     $cppContent = Get-Content $EditorCpp -Raw
-    if ($cppContent -notmatch "getZipFile|createAssetInputStream|BinaryData::getNamedResource") {
-        $Issues += "No resource loading mechanism found - Need getZipFile(), createAssetInputStream(), or BinaryData::getNamedResource()"
+    if ($cppContent -notmatch "getZipFile|createAssetInputStream|getNamedResource") {
+        $Issues += "No resource loading mechanism found - Need getZipFile(), createAssetInputStream(), or getNamedResource()"
     }
 }
 
