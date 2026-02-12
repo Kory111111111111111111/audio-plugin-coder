@@ -1,3 +1,4 @@
+ou also
 <!DOCTYPE html>
 <html lang="en">
 
@@ -121,7 +122,7 @@
         }
 
         header {
-            padding: 24px 40px;
+            padding: 16px 32px;
             background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border-dim);
@@ -134,15 +135,15 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
         }
 
         .brand-logo {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             background: var(--primary);
             border-radius: 50%;
-            box-shadow: 0 0 20px var(--primary);
+            box-shadow: 0 0 16px var(--primary);
             position: relative;
         }
 
@@ -185,69 +186,88 @@
             gap: 32px;
         }
 
-        /* MAIN GRID */
+        /* MAIN GRID (2 ROWS, 4 COLUMNS) */
         main {
             flex: 1;
-            padding: 32px;
+            padding: 20px 24px;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(2, 1fr);
-            gap: 20px;
+            gap: 16px;
             z-index: 5;
+            overflow: hidden;
         }
 
-        /* MODULE CARDS */
+        /* MODULE CARDS (COMPACT HEIGHT, WIDER WIDTH) */
         .module-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-dim);
-            border-radius: 16px;
-            padding: 20px;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            backdrop-filter: blur(12px);
+            background: rgba(30, 41, 59, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 14px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(16px);
             display: flex;
             flex-direction: column;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            min-height: 0;
+            max-height: 280px;
+            /* LOCK HEIGHT */
         }
 
         .module-card:hover {
-            transform: translateY(-4px) scale(1.02);
-            border-color: var(--border-bright);
-            background: rgba(30, 41, 59, 0.5);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(30, 41, 59, 0.55);
         }
 
         .module-card.active {
-            border-color: rgba(245, 158, 11, 0.4);
-            box-shadow: 0 0 40px rgba(245, 158, 11, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.2);
-            background: var(--bg-card-active);
+            border-color: var(--primary);
+            background: rgba(30, 41, 59, 0.7);
+            box-shadow: 0 0 30px rgba(245, 158, 11, 0.1);
         }
 
         .module-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
 
         .module-title {
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 11px;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 2px;
             color: var(--text-dim);
-            transition: color 0.3s;
         }
 
         .module-card.active .module-title {
             color: var(--primary);
         }
 
+        /* REORGANIZED CONTENT LAYOUT (Narrower cards) */
         .module-content {
             flex: 1;
-            display: flex;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            /* Split controls into two columns */
+            justify-items: center;
             align-items: center;
-            gap: 24px;
-            flex-wrap: wrap;
+            gap: 12px 10px;
+            /* Vertical and Horizontal gaps */
+            min-height: 0;
+            padding-top: 4px;
+        }
+
+        /* For modules with only 2 knobs, we can keep them in one row if they fit better */
+        #mod-halftime .module-content,
+        #mod-autopan .module-content {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* 3-item modules will naturally flow to 2nd row */
+        /* Center the last item if it's alone on the row */
+        .module-content> :last-child:nth-child(odd) {
+            grid-column: span 2;
         }
 
         /* ENHANCED KNOBS */
@@ -255,20 +275,20 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 4px;
+            width: 100%;
         }
 
         .knob-container {
             position: relative;
-            width: 56px;
-            height: 56px;
+            width: 48px;
+            height: 48px;
             cursor: ns-resize;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
         }
 
         .knob-container.small {
-            width: 36px;
-            height: 36px;
+            width: 32px;
+            height: 32px;
         }
 
         .knob-svg {
