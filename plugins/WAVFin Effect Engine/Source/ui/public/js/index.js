@@ -1,7 +1,7 @@
 import * as Juce from "./juce/juce_core.js";
 
 // Main entry point
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     console.log("DOM Content Loaded - Initializing UI...");
 
     try {
@@ -25,13 +25,60 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Failed to initialize selectors:", e);
     }
 
-    // Safety check just in case
+    // Fetch parameter values from C++ (bypasses event visibility issues on window reopen)
+    try {
+        if (typeof Juce !== 'undefined' && Juce !== null &&
+            window.__JUCE__?.initialisationData?.__juce__functions?.includes?.("getAllParameterValues")) {
+            const getParams = Juce.getNativeFunction("getAllParameterValues");
+            const values = await getParams();
+            if (values && typeof values === 'object') {
+                applyParameterValues(values);
+            }
+        }
+    } catch (e) {
+        console.warn("Could not fetch initial parameter values:", e);
+    }
+
     if (typeof Juce === 'undefined' || Juce === null) {
         console.warn("Juce module not loaded correctly.");
     } else {
         console.log("Juce module detected");
     }
 });
+
+/** Apply parameter values from C++ backend (normalised 0-1). Bypasses event system. */
+function applyParameterValues(values) {
+    const sliderParams = [
+        "global_mix", "output_gain", "reverb_size", "reverb_decay", "reverb_mix",
+        "delay_time", "delay_feedback", "delay_mix", "chorus_rate", "chorus_depth", "chorus_mix",
+        "filter_cutoff", "filter_res", "filter_lfo_rate", "filter_lfo_depth",
+        "pan_rate", "pan_depth", "halftime_mix", "halftime_fade",
+        "vintage_wow", "vintage_flutter", "vintage_noise", "sat_drive", "sat_mix"
+    ];
+    const toggleParams = [
+        "reverb_enable", "delay_enable", "chorus_enable", "filter_enable", "pan_enable",
+        "halftime_enable", "vintage_enable", "sat_enable"
+    ];
+    for (const id of sliderParams) {
+        const v = values[id];
+        if (typeof v === 'number') {
+            const s = Juce.getSliderState(id);
+            if (s) s.setNormalisedValue(v);
+        }
+    }
+    for (const id of toggleParams) {
+        const v = values[id];
+        if (typeof v === 'number') {
+            const t = Juce.getToggleState(id);
+            if (t) t.setValue(v > 0.5);
+        }
+    }
+    const satType = values["sat_type"];
+    if (typeof satType === 'number') {
+        const c = Juce.getComboBoxState("sat_type");
+        if (c) c.setChoiceIndex(Math.round(satType * 3));
+    }
+}
 
 /**
  * Utility class for "Interaction Locking".

@@ -49,6 +49,8 @@ endif()
 # ============================================
 # EXTERNAL TOOLS
 # ============================================
+# Prefer project's FindWebView2 (supports .nuget/packages layout) over JUCE's
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_tools/JUCE")
 set(VISAGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_tools/visage")
 

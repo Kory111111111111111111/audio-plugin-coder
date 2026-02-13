@@ -13,6 +13,7 @@ design_library/_exclude/
 
 # Build Artifacts (The Dirty Zone)
 build/
+.cmake/
 cmake-build-*/
 .vs/
 out/

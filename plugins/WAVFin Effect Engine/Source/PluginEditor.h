@@ -5,7 +5,16 @@
 #include "ParameterIDs.h"
 
 //==============================================================================
-class WAVFinEffectEngineAudioProcessorEditor  : public juce::AudioProcessorEditor
+/** WebView that notifies when page loads - enables sync when JS is ready. */
+struct WAVFinWebView : juce::WebBrowserComponent {
+  using WebBrowserComponent::WebBrowserComponent;
+  std::function<void(const juce::String&)> onPageLoaded;
+  void pageFinishedLoading(const juce::String& url) override;
+};
+
+//==============================================================================
+class WAVFinEffectEngineAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                                private juce::Timer
 {
 public:
     WAVFinEffectEngineAudioProcessorEditor (WAVFinEffectEngineAudioProcessor&);
@@ -14,9 +23,14 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+    void visibilityChanged() override;
 
 private:
+    void timerCallback() override;
+    void syncParametersToWebView();
+
     WAVFinEffectEngineAudioProcessor& audioProcessor;
+    int syncRetryCount{0};
 
     // ═══════════════════════════════════════════════════════════════════
     // CRITICAL: Member Declaration Order (Prevents DAW Crashes)
@@ -76,7 +90,7 @@ private:
 
 
     // 2. WEBVIEW SECOND
-    std::unique_ptr<juce::WebBrowserComponent> webView;
+    std::unique_ptr<WAVFinWebView> webView;
 
 
     // 3. PARAMETER ATTACHMENTS LAST

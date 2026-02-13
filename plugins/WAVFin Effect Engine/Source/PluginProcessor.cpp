@@ -573,10 +573,33 @@ void WAVFinEffectEngineAudioProcessor::processBlock (juce::AudioBuffer<float>& b
         }
     }
 
-    // 8. Reverb
+    // 8. Reverb (FIXED: Manual Dry/Wet Mix to prevent volume boost)
     if (reverbEnableParam && reverbEnableParam->load() > 0.5f)
     {
-        reverb.process (context);
+        float mix = reverbMixParam->load() / 100.0f;
+        
+        // Create a wet buffer initialized with current signal
+        juce::AudioBuffer<float> wetBuffer;
+        wetBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, false);
+        wetBuffer.makeCopyOf(buffer, true);
+        
+        // Process wet buffer 100% wet
+        juce::dsp::AudioBlock<float> wetBlock (wetBuffer);
+        juce::dsp::ProcessContextReplacing<float> wetContext (wetBlock);
+        reverb.process (wetContext);
+        
+        // Manual Mix
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* dryData = buffer.getWritePointer(ch);
+            auto* wetData = wetBuffer.getReadPointer(ch);
+            
+            for (int s = 0; s < buffer.getNumSamples(); ++s)
+            {
+                // Linear interpolation: 0% = Dry, 100% = Wet
+                dryData[s] = (wetData[s] * mix) + (dryData[s] * (1.0f - mix));
+            }
+        }
     }
 
     // 9. Output Gain
